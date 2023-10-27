@@ -170,3 +170,8 @@ func (f *File) IsDir() bool {
 func (f *File) Sys() any {
 	return nil
 }
+
+// NewFile returns a new File instance with the internal buffer set to s
+func NewFile(s []byte) *File {
+	return &File{buf: s}
+}
