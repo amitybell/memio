@@ -1,6 +1,7 @@
 package memio
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 	"io/fs"
@@ -56,10 +57,10 @@ func (f *File) Read(p []byte) (int, error) {
 	return n, nil
 }
 
-// expand grows the internal buffer to fill n bytes and sets pos to the end
+// Expand grows the internal buffer to fill n bytes and sets pos to the end
 //
 // It returns a slice that should be filled with n bytes of content
-func (f *File) expand(n int) []byte {
+func (f *File) Expand(n int) []byte {
 	n += f.pos
 	f.buf = slices.Grow(f.buf, n)
 	if n > len(f.buf) {
@@ -72,21 +73,39 @@ func (f *File) expand(n int) []byte {
 
 // Seek implements io.Writer
 func (f *File) Write(p []byte) (int, error) {
-	return copy(f.expand(len(p)), p), nil
+	return copy(f.Expand(len(p)), p), nil
 }
 
 // WriteString implements io.StringWriter
 func (f *File) WriteString(p string) (int, error) {
-	s := f.expand(len(p))
+	s := f.Expand(len(p))
 	n := copy(s, p)
 	return n, nil
 }
 
 // WriteByte implements io.ByteWriter
 func (f *File) WriteByte(p byte) error {
-	s := f.expand(1)
+	s := f.Expand(1)
 	s[0] = p
 	return nil
+}
+
+// WriteUint16 writes n in the byte order specified by o
+func (f *File) WriteUint16(o binary.ByteOrder, n uint16) {
+	s := f.Expand(2)
+	o.PutUint16(s, n)
+}
+
+// WriteUint32 writes n in the byte order specified by o
+func (f *File) WriteUint32(o binary.ByteOrder, n uint32) {
+	s := f.Expand(4)
+	o.PutUint32(s, n)
+}
+
+// WriteUint64 writes n in the byte order specified by o
+func (f *File) WriteUint64(o binary.ByteOrder, n uint64) {
+	s := f.Expand(8)
+	o.PutUint64(s, n)
 }
 
 // Seek implements io.Seeker
