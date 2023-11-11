@@ -1,10 +1,12 @@
 package memio
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"io/fs"
+	"math"
 	"slices"
 	"time"
 	"unsafe"
@@ -62,16 +64,57 @@ func (f *File) ReadByte() (byte, error) {
 	if f.pos >= len(f.buf) {
 		return 0, io.EOF
 	}
-	c := f.buf[f.pos+1]
+	c := f.buf[f.pos]
 	f.pos += 1
 	return c, nil
 }
 
-// ReadFull wraps io.ReadFull(f, p)
-func (f *File) ReadFull(p []byte) (int, error) {
-	n, err := io.ReadFull(f, p)
+// readBytes implements ReadBytes and ReadString, returning a slice to the internal buffer
+func (f *File) readBytes(delim byte) ([]byte, error) {
+	if f.pos >= len(f.buf) {
+		return nil, io.ErrUnexpectedEOF
+	}
+	if i := bytes.IndexByte(f.buf[f.pos:], delim); i >= 0 {
+		s := f.buf[f.pos : f.pos+i]
+		f.pos += i
+		return s, nil
+	}
+	s := f.buf[f.pos:]
+	f.pos = len(f.buf)
+	return s, io.ErrUnexpectedEOF
+}
+
+// ReadBytes reads bytes up to and excluding delim
+// An error (wrapping io.ErrUnexpectedEOF) is returned iff delim is not found
+func (f *File) ReadBytes(delim byte) ([]byte, error) {
+	p, err := f.readBytes(delim)
+	q := append([]byte(nil), p...)
 	if err != nil {
-		return n, fmt.Errorf("File.ReadFull: %w", err)
+		return q, fmt.Errorf("File.ReadBytes: %w", err)
+	}
+	return q, nil
+}
+
+// ReadString reads bytes up to and excluding delim
+// An error (wrapping io.ErrUnexpectedEOF) is returned iff delim is not found
+func (f *File) ReadString(delim byte) (string, error) {
+	p, err := f.ReadBytes(delim)
+	q := string(p)
+	if err != nil {
+		return q, fmt.Errorf("File.ReadString: %w", err)
+	}
+	return q, nil
+}
+
+// ReadFull fills buffer p, or returns the number of bytes read and error io.ErrUnexpectedEOF
+func (f *File) ReadFull(p []byte) (int, error) {
+	if f.pos >= len(f.buf) {
+		return 0, io.ErrUnexpectedEOF
+	}
+	n := copy(p, f.buf[f.pos:])
+	f.pos += n
+	if n < len(p) {
+		return n, io.ErrUnexpectedEOF
 	}
 	return n, nil
 }
@@ -101,6 +144,42 @@ func (f *File) ReadUint64(o binary.ByteOrder) (uint64, error) {
 		return 0, fmt.Errorf("File.ReadUint64: %w", err)
 	}
 	return o.Uint64(p[:]), nil
+}
+
+// ReadInt16 is a wrapper around int16(ReadUint16)
+func (f *File) ReadInt16(o binary.ByteOrder) (int16, error) {
+	n, err := f.ReadUint16(o)
+	return int16(n), err
+}
+
+// ReadInt32 is a wrapper around int32(ReadUint32)
+func (f *File) ReadInt32(o binary.ByteOrder) (int32, error) {
+	n, err := f.ReadUint32(o)
+	return int32(n), err
+}
+
+// ReadInt64 is a wrapper around int64(ReadUint64)
+func (f *File) ReadInt64(o binary.ByteOrder) (int64, error) {
+	n, err := f.ReadUint64(o)
+	return int64(n), err
+}
+
+// ReadFloat32 reads a 32-bit floating point number in the byte order specified by o
+func (f *File) ReadFloat32(o binary.ByteOrder) (float32, error) {
+	n, err := f.ReadUint32(o)
+	if err != nil {
+		return 0, fmt.Errorf("File.ReadFloat32: %w", err)
+	}
+	return math.Float32frombits(n), nil
+}
+
+// ReadFloat64 reads a 64-bit floating point number in the byte order specified by o
+func (f *File) ReadFloat64(o binary.ByteOrder) (float64, error) {
+	n, err := f.ReadUint64(o)
+	if err != nil {
+		return 0, fmt.Errorf("File.ReadFloat64: %w", err)
+	}
+	return math.Float64frombits(n), nil
 }
 
 // Expand grows the internal buffer to fill n bytes and sets pos to the end
@@ -152,6 +231,31 @@ func (f *File) WriteUint32(o binary.ByteOrder, n uint32) {
 func (f *File) WriteUint64(o binary.ByteOrder, n uint64) {
 	s := f.Expand(8)
 	o.PutUint64(s, n)
+}
+
+// WriteInt16 is a wrapper around f.WriteUint16(o, uint16(n))
+func (f *File) WriteInt16(o binary.ByteOrder, n int16) {
+	f.WriteUint16(o, uint16(n))
+}
+
+// WriteInt32 is a wrapper around f.WriteUint32(o, uint32(n))
+func (f *File) WriteInt32(o binary.ByteOrder, n int32) {
+	f.WriteUint32(o, uint32(n))
+}
+
+// WriteInt64 is a wrapper around f.WriteUint64(o, uint64(n))
+func (f *File) WriteInt64(o binary.ByteOrder, n int64) {
+	f.WriteUint64(o, uint64(n))
+}
+
+// WriteFloat64 is a wrapper around f.WriteUint64(o, math.Float64bits(n))
+func (f *File) WriteFloat64(o binary.ByteOrder, n float64) {
+	f.WriteUint64(o, math.Float64bits(n))
+}
+
+// WriteFloat32 is a wrapper around f.WriteUint32(o, math.Float32bits(n))
+func (f *File) WriteFloat32(o binary.ByteOrder, n float32) {
+	f.WriteUint32(o, math.Float32bits(n))
 }
 
 // Seek implements io.Seeker
