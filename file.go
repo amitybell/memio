@@ -57,6 +57,16 @@ func (f *File) Read(p []byte) (int, error) {
 	return n, nil
 }
 
+// ReadByte implements io.ByteReader
+func (f *File) ReadByte() (byte, error) {
+	if f.pos >= len(f.buf) {
+		return 0, io.EOF
+	}
+	c := f.buf[f.pos+1]
+	f.pos += 1
+	return c, nil
+}
+
 // Expand grows the internal buffer to fill n bytes and sets pos to the end
 //
 // It returns a slice that should be filled with n bytes of content
