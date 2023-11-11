@@ -67,6 +67,42 @@ func (f *File) ReadByte() (byte, error) {
 	return c, nil
 }
 
+// ReadFull wraps io.ReadFull(f, p)
+func (f *File) ReadFull(p []byte) (int, error) {
+	n, err := io.ReadFull(f, p)
+	if err != nil {
+		return n, fmt.Errorf("File.ReadFull: %w", err)
+	}
+	return n, nil
+}
+
+// ReadUint16 reads a 16-bit number in the byte order specified by o
+func (f *File) ReadUint16(o binary.ByteOrder) (uint16, error) {
+	p := [2]byte{}
+	if _, err := f.ReadFull(p[:]); err != nil {
+		return 0, fmt.Errorf("File.ReadUint16: %w", err)
+	}
+	return o.Uint16(p[:]), nil
+}
+
+// ReadUint32 reads a 32-bit number in the byte order specified by o
+func (f *File) ReadUint32(o binary.ByteOrder) (uint32, error) {
+	p := [4]byte{}
+	if _, err := f.ReadFull(p[:]); err != nil {
+		return 0, fmt.Errorf("File.ReadUint32: %w", err)
+	}
+	return o.Uint32(p[:]), nil
+}
+
+// ReadUint64 reads a 64-bit number in the byte order specified by o
+func (f *File) ReadUint64(o binary.ByteOrder) (uint64, error) {
+	p := [8]byte{}
+	if _, err := f.ReadFull(p[:]); err != nil {
+		return 0, fmt.Errorf("File.ReadUint64: %w", err)
+	}
+	return o.Uint64(p[:]), nil
+}
+
 // Expand grows the internal buffer to fill n bytes and sets pos to the end
 //
 // It returns a slice that should be filled with n bytes of content
