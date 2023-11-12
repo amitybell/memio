@@ -76,7 +76,7 @@ func (f *File) readBytes(delim byte) ([]byte, error) {
 	}
 	if i := bytes.IndexByte(f.buf[f.pos:], delim); i >= 0 {
 		s := f.buf[f.pos : f.pos+i]
-		f.pos += i
+		f.pos += i + 1 // skip over delim
 		return s, nil
 	}
 	s := f.buf[f.pos:]
@@ -98,7 +98,7 @@ func (f *File) ReadBytes(delim byte) ([]byte, error) {
 // ReadString reads bytes up to and excluding delim
 // An error (wrapping io.ErrUnexpectedEOF) is returned iff delim is not found
 func (f *File) ReadString(delim byte) (string, error) {
-	p, err := f.ReadBytes(delim)
+	p, err := f.readBytes(delim)
 	q := string(p)
 	if err != nil {
 		return q, fmt.Errorf("File.ReadString: %w", err)
