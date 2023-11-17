@@ -196,6 +196,23 @@ func (f *File) Expand(n int) []byte {
 	return s
 }
 
+// WriteTo implements io.WriterTo
+func (f *File) WriteTo(w io.Writer) (int64, error) {
+	if f.pos >= len(f.buf) {
+		return 0, fmt.Errorf("File.WriteTo: %w", io.ErrUnexpectedEOF)
+	}
+	s := f.buf[f.pos:]
+	n, err := w.Write(s)
+	f.pos += n
+	if err != nil {
+		return int64(n), fmt.Errorf("File.WriteTo: %w", err)
+	}
+	if n < len(s) {
+		return int64(n), fmt.Errorf("File.WriteTo: %w", io.ErrShortWrite)
+	}
+	return int64(n), nil
+}
+
 // Seek implements io.Writer
 func (f *File) Write(p []byte) (int, error) {
 	return copy(f.Expand(len(p)), p), nil
