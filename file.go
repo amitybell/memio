@@ -3,6 +3,7 @@ package memio
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -196,6 +197,31 @@ func (f *File) Expand(n int) []byte {
 	return s
 }
 
+// Grow increases the capacity of the internal buffer to guarantee space for another n byte without reallocation
+func (f *File) Grow(n int) *File {
+	f.buf = slices.Grow(f.buf, f.pos+n)
+	return f
+}
+
+// ReadFrom implements io.ReaderFrom
+func (f *File) ReadFrom(r io.Reader) (n int64, err error) {
+	for {
+		f.Grow(1 << 10)
+		m, err := r.Read(f.buf[f.pos:cap(f.buf)])
+		if m < 0 {
+			panic(fmt.Sprintf("%T.Read() returned negative count %d", r, m))
+		}
+		f.buf = f.buf[:f.pos+m]
+		n += int64(m)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return n, nil
+			}
+			return n, err
+		}
+	}
+}
+
 // WriteTo implements io.WriterTo
 func (f *File) WriteTo(w io.Writer) (int64, error) {
 	if f.pos >= len(f.buf) {
@@ -299,6 +325,11 @@ func (f *File) Seek(offset int64, whence int) (int64, error) {
 		f.buf = slices.Grow(f.buf, f.pos)[:f.pos]
 	}
 	return sp, nil
+}
+
+// Rewind is equivalent to `f.Seek(0, 0)`
+func (f *File) Rewind() (int64, error) {
+	return f.Seek(0, 0)
 }
 
 // Stat implements the fs.File.Stat interface
