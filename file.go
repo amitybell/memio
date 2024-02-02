@@ -327,9 +327,12 @@ func (f *File) Seek(offset int64, whence int) (int64, error) {
 	return sp, nil
 }
 
-// Rewind is equivalent to `f.Seek(0, 0)`
-func (f *File) Rewind() (int64, error) {
-	return f.Seek(0, 0)
+// Rewind sets the Read position of the internal buffer back to the start
+//
+// It's equivalent to Seek(0, io.SeekStart) or Seek(0, 0)
+func (f *File) Rewind() *File {
+	f.pos = 0
+	return f
 }
 
 // Stat implements the fs.File.Stat interface
