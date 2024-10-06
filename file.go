@@ -44,10 +44,16 @@ func (f *File) StringRef() string {
 	return unsafe.String(unsafe.SliceData(f.buf), len(f.buf))
 }
 
-// Reset sets the internal buffer to p and the internal offset to 0
-func (f *File) Reset(p []byte) {
-	f.pos = 0
-	f.buf = p
+// Reset is equivalent to Truncate(0)
+func (f *File) Reset() *File {
+	return f.Truncate(0)
+}
+
+// Truncate sets the internal offset and buffer size to n
+func (f *File) Truncate(n int) *File {
+	f.Seek(int64(n), io.SeekStart)
+	f.buf = f.buf[:n]
+	return f
 }
 
 // Read implements io.Reader

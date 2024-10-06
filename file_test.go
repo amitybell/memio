@@ -74,3 +74,22 @@ func TestReader(t *testing.T) {
 		t.Fatalf("Expected `%s`; Got `%s`", exp, got)
 	}
 }
+
+func TestTruncate(t *testing.T) {
+	f := File{}
+
+	f.WriteString("hello")
+	if s := f.StringRef(); s != "hello" {
+		t.Fatalf("Expected %q; Got %q", "hello", s)
+	}
+
+	f.Truncate(4).WriteString("world")
+	if s := f.StringRef(); s != "hellworld" {
+		t.Fatalf("Expected %q; Got %q", "hellworld", s)
+	}
+
+	f.Reset().WriteString("world")
+	if s := f.StringRef(); s != "world" {
+		t.Fatalf("Expected %q; Got %q", "world", s)
+	}
+}
