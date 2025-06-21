@@ -10,6 +10,7 @@ import (
 	"math"
 	"slices"
 	"time"
+	"unicode/utf8"
 	"unsafe"
 )
 
@@ -46,7 +47,9 @@ func (f *File) StringRef() string {
 
 // Reset is equivalent to Truncate(0)
 func (f *File) Reset() *File {
-	return f.Truncate(0)
+	f.pos = 0
+	f.buf = f.buf[:0]
+	return f
 }
 
 // Truncate sets the internal offset and buffer size to n
@@ -305,6 +308,60 @@ func (f *File) WriteFloat64(o binary.ByteOrder, n float64) {
 // WriteFloat32 is a wrapper around f.WriteUint32(o, math.Float32bits(n))
 func (f *File) WriteFloat32(o binary.ByteOrder, n float32) {
 	f.WriteUint32(o, math.Float32bits(n))
+}
+
+func (f *File) Printf(format string, args ...any) *File {
+	fmt.Fprintf(f, format, args...)
+	return f
+}
+
+// PrintRune appends the UTF-8 encoding of r to the buffer at the current position
+func (f *File) PrintRune(r rune) *File {
+	s := utf8.AppendRune(f.buf[:f.pos], r)
+	if len(s) > len(f.buf) {
+		f.buf = s
+	}
+	f.pos = len(s)
+	return f
+}
+
+func (f *File) PrintString(a ...string) *File {
+	n := 0
+	for _, s := range a {
+		n += len(s)
+	}
+	f.Grow(n)
+	for _, s := range a {
+		f.buf = append(f.buf[:f.pos], s...)
+		f.pos += len(s)
+	}
+	return f
+}
+
+func (f *File) PrintBytes(s []byte) *File {
+	f.buf = append(f.buf[:f.pos], s...)
+	f.pos += len(s)
+	return f
+}
+
+func (f *File) PrintByte(b byte) *File {
+	f.buf = append(f.buf[:f.pos], b)
+	f.pos += 1
+	return f
+}
+
+func (f *File) PrintFunc(size int, fn func(s []byte) []byte) *File {
+	f.Grow(size)
+	s := f.buf[f.pos : f.pos : f.pos+size]
+	t := fn(s)
+	if unsafe.SliceData(s) == unsafe.SliceData(t) {
+		f.pos += len(t)
+		f.buf = f.buf[:f.pos]
+	} else {
+		f.buf = append(f.buf[:f.pos], t...)
+		f.pos = len(f.buf)
+	}
+	return f
 }
 
 // Seek implements io.Seeker
